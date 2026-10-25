@@ -1,0 +1,23 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+{%- if project_type != 'docs' %}
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+{%- endif %}
+{%- if project_type == 'analysis' %}
+
+# Data stays out of git
+data/*
+!data/README.md
+{%- endif %}

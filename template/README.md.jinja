@@ -1,0 +1,25 @@
+# {{ project_name }}
+
+{{ description }}
+{% if project_type != 'docs' %}
+## Setup
+
+Requires [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync
+uv run pytest
+```
+{% endif %}
+## Working with agents
+
+Project context and rules for coding agents live in [`AGENTS.md`](AGENTS.md)
+and [`agents/`](agents/). This repository was created from
+[project-template](https://github.com/FelixSchramm/project-template); pull in
+template updates with `copier update`.
+{%- if license == 'MIT' %}
+
+## License
+
+[MIT](LICENSE)
+{%- endif %}

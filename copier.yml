@@ -1,0 +1,78 @@
+_subdirectory: template
+_min_copier_version: "9.0.0"
+# HANDOVER.md belongs to the agents once created; template updates never overwrite it.
+_skip_if_exists:
+  - HANDOVER.md
+
+project_name:
+  type: str
+  help: Project name (human readable)
+
+project_slug:
+  type: str
+  help: Repository name
+  default: "{{ project_name | lower | replace(' ', '-') }}"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9-]*$')) %}
+    Use lowercase letters, digits and hyphens only.
+    {% endif %}
+
+description:
+  type: str
+  help: One-sentence description
+
+project_type:
+  type: str
+  help: Project type
+  choices:
+    Python app or pipeline (uv, src/, tests/, CI): python
+    Notebook or ML analysis (python + notebooks/ + data/): analysis
+    Docs or knowledge collection (Markdown only): docs
+
+package_name:
+  type: str
+  help: Python package name
+  default: "{{ project_slug | replace('-', '_') }}"
+  when: "{{ project_type != 'docs' }}"
+  validator: >-
+    {% if not (package_name | regex_search('^[a-z_][a-z0-9_]*$')) %}
+    Must be a valid Python identifier (no leading digit).
+    {% endif %}
+
+python_version:
+  type: str
+  help: Python version
+  default: "3.12"
+  when: "{{ project_type != 'docs' }}"
+
+github_owner:
+  type: str
+  help: GitHub owner
+  default: FelixSchramm
+
+author_name:
+  type: str
+  help: Author name
+  default: Felix Schramm
+
+license:
+  type: str
+  help: License
+  choices: [MIT, none]
+  default: MIT
+
+prose_language:
+  type: str
+  help: Language for comments, CLI texts and user-facing strings (identifiers stay English)
+  default: English
+
+agent_relay:
+  type: str
+  help: Autonomous agent relay (dormant = files present, nothing runs)
+  choices: [dormant, active]
+  default: dormant
+
+integration_branch:
+  type: str
+  help: Integration branch for the agent relay
+  default: agents/integration

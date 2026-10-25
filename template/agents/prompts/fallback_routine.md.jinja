@@ -1,0 +1,16 @@
+# Fallback task — prompt and settings
+
+The safety net for the relay (activation step 5 in `agents/RELAY.md`). It
+fires twice a day and only acts if the relay has stalled.
+
+- **Schedule:** `0 6,18 * * *` (06:00 and 18:00 UTC)
+- **Mode:** fresh session per firing
+- **Name suggestion:** `{{ project_name }} relay fallback (2x daily)`
+
+## Prompt
+
+> You are the fallback for the autonomous agent relay on
+> {{ github_owner }}/{{ project_slug }}. Make sure the repository is checked
+> out, fetch and check out branch `{{ integration_branch }}`, read AGENTS.md,
+> agents/RELAY.md, agents/CODING_RULES.md and HANDOVER.md, then follow the
+> "Fallback session" section of agents/RELAY.md. Apply the budget rule.
