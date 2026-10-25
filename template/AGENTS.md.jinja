@@ -1,0 +1,39 @@
+# AGENTS.md
+
+Project context for coding agents (Claude Code, Codex, Cursor, Copilot, ...).
+Keep this short and current.
+
+Coding standards and behavioral guidelines live in
+[`agents/CODING_RULES.md`](agents/CODING_RULES.md) — they apply to every
+session and every role.
+
+## Agent relay
+
+{% if agent_relay == 'active' -%}
+**Active.** This repository is worked on by an autonomous relay of
+single-purpose agent sessions. Read [`agents/RELAY.md`](agents/RELAY.md) and
+`HANDOVER.md` before doing anything else, then do the one job your role
+defines.
+{%- else -%}
+Dormant. [`agents/RELAY.md`](agents/RELAY.md) describes an autonomous relay of
+single-purpose agent sessions; it does nothing until it is activated (see
+"Activation" there). Ignore it for normal interactive work.
+{%- endif %}
+
+## What this is
+
+{{ description }}
+
+<!-- Add two or three sentences: where the core code lives, the key entry
+points, and what the repository is for. -->
+
+## Commands
+
+{% if project_type == 'docs' -%}
+Markdown only; there is nothing to build or test.
+{%- else -%}
+- Setup: `uv sync`
+- Format: `uv run ruff format .`
+- Lint: `uv run ruff check .`
+- Tests: `uv run pytest`
+{%- endif %}

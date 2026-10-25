@@ -1,0 +1,38 @@
+[project]
+name = "{{ project_slug }}"
+version = "0.1.0"
+description = {{ description | tojson }}
+readme = "README.md"
+requires-python = ">={{ python_version }}"
+dependencies = []
+
+[dependency-groups]
+dev = [
+{%- if project_type == 'analysis' %}
+    "ipykernel",
+{%- endif %}
+    "pytest",
+    "ruff",
+]
+
+# An application, not a distributable library: uv does not build the project
+# itself; src/ is put on the path for pytest below.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D102", "D103", "D107"]
+{%- if project_type == 'analysis' %}
+"*.ipynb" = ["D"]
+{%- endif %}

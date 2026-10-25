@@ -1,0 +1,174 @@
+# Agent relay protocol
+
+An autonomous relay of single-purpose agent sessions that works through a
+plan of GitHub issues, one issue at a time. This file is agent-neutral: how a
+session starts its successor, schedules itself and measures its budget is
+defined by the runtime adapter for the agent in use
+(`agents/runtimes/<agent>.md`, currently
+[`claude-code.md`](runtimes/claude-code.md)).
+
+Repository: `{{ github_owner }}/{{ project_slug }}`
+Integration branch: `{{ integration_branch }}`
+
+## Roles
+
+- **Worker session:** implements exactly one issue and opens its PR, then
+  starts the reviewer.
+- **Reviewer session:** reviews that PR, fixes clear findings itself, merges,
+  then starts the next worker.
+- **Fallback session:** started twice a day by a scheduled task; restarts the
+  relay if it stalled (>12h without a commit while issues remain open),
+  otherwise stands down.
+
+No session does two jobs. The work plan (which issues, in which order) lives
+in `HANDOVER.md`, not in this file.
+
+## Rules for every session
+
+1. **Branches:** `{{ integration_branch }}` collects all reviewed merges
+   (never force-push it). Each issue lives on its own feature branch
+   `issue-NN-<short-slug>` off the integration branch. The default branch is
+   only touched at the very end, by one PR the user reviews.
+2. **Session start:** make sure the repository is checked out (see the
+   runtime adapter), fetch and check out `{{ integration_branch }}`, read
+   `AGENTS.md`, `agents/CODING_RULES.md`, this file and `HANDOVER.md`
+   {%- if project_type != 'docs' %}, run `uv sync`{% endif %}, then do the
+   one job your role defines.
+3. **Commit early, push often:** commit and push after every completed unit
+   of work. Git history and `HANDOVER.md` are the only handover channel —
+   nothing outside pushed commits survives a session.
+4. **Keep `HANDOVER.md` current:** update it before ending your session
+   (done / in progress / next step / open PR and its state / pitfalls) and
+   push it.
+5. **Budget rule:** when less than 10% of your context budget is left (how
+   to measure it: runtime adapter), start nothing new: commit and push,
+   finalize `HANDOVER.md`, write an archive snapshot, and schedule the
+   successor with a delay instead of starting it immediately (runtime
+   adapter), then end the turn.
+6. **Starting the successor:** follow the runtime adapter. The prompt must be
+   fully standalone — use the templates below and fill in issue/PR numbers.
+   Never end a session without having started or scheduled the successor,
+   unless the relay is complete (rule 7). If starting fails in every way the
+   adapter describes, record it in `HANDOVER.md`; the fallback picks the
+   relay up within 12 hours.
+7. **Completion:** when every issue of the work plan in `HANDOVER.md` is
+   done, start no successor. Mark the relay as finished in `HANDOVER.md`,
+   write a final archive snapshot (reason: "all issues done"), and ask the
+   user whether to open the PR from `{{ integration_branch }}` to the default
+   branch and disable the fallback task.
+
+## Limits of unattended sessions — degrade gracefully
+
+- Secrets and API keys are usually not available. Never call paid APIs, mail
+  services or scraped websites for real; verify with tests that use fakes or
+  mocks.
+- Never invent user content (CV, credentials, personal data). Build the code
+  path and document what the user has to provide.
+- **Issues with acceptance items that cannot be verified in the session**
+  (live run, scheduled workflow, test mail, user content): after merging, do
+  NOT close the issue. Comment on it which items remain for the user and list
+  them in `HANDOVER.md` under "Needs user / live verification". For the relay
+  such an issue counts as done.
+
+## Worker session (one issue)
+
+1. Identify the next open issue N from `HANDOVER.md`; read issue N in full.
+2. Create `issue-NN-<short-slug>` off the integration branch.
+3. Implement the issue following `agents/CODING_RULES.md`; commit and push
+   per unit of work.
+4. Open a PR targeting `{{ integration_branch }}`. `Closes #N` does NOT
+   auto-close issues for PRs into a non-default branch — the reviewer closes
+   the issue manually after the merge.
+5. Update `HANDOVER.md` (PR number, state: "review pending") and push it to
+   the integration branch.
+6. Start the reviewer session (worker → reviewer template) and end the turn.
+
+## Reviewer session (one PR)
+
+1. Review the full PR diff with fresh eyes. Three questions, in priority
+   order:
+   1. **Is the code as simple and as short as possible?** Flag
+      overcomplication, speculative abstraction, unnecessary
+      configurability, dead code, anything where 50 lines would do the job
+      of 200.
+   2. **Does hand-written code reimplement something an established package
+      already provides?** Prefer the package; flag the reinvention.
+   3. **Are the rules in `agents/CODING_RULES.md` followed?** Especially
+      "Simplicity First" and "Surgical Changes".
+2. Post the findings as a PR review with inline comments, most severe first.
+   If there is nothing to flag, say so in a short review — do not invent
+   findings.
+3. **Fix only clear-cut findings yourself** (simplifications, package
+   replacements, style or docstring fixes) and push them to the feature
+   branch. **Structural or debatable findings are NOT implemented**: leave
+   them as PR comments and record them in `HANDOVER.md`.
+4. {% if project_type != 'docs' %}Run `uv run pytest` on the PR head; merge
+   only if it passes. {% endif %}Merge the PR into the integration branch
+   (regular merge, no force-push), close issue #N with a comment linking the
+   PR (exception: unverifiable acceptance items, see above), delete the
+   feature branch.
+5. Update `HANDOVER.md` (issue N done, next issue) and write an archive
+   snapshot (reason: "issue #N merged").
+6. Start the next worker session (reviewer → worker template) and end the
+   turn — or, if all issues are done, follow "Completion".
+
+## Fallback session
+
+Read `HANDOVER.md` and the state of the work-plan issues, then decide:
+
+- All issues done or `HANDOVER.md` says the relay is finished: do nothing;
+  end with one line suggesting to disable the fallback task.
+- Latest commit on `{{ integration_branch }}` or an open feature branch is
+  less than 12 hours old: the relay is healthy; end silently.
+- Otherwise the relay stalled: adopt the role matching the recorded state
+  (open PR with review pending → reviewer; otherwise → worker for the next
+  open issue) and follow that role, including starting the successor.
+
+## Handover archive
+
+Snapshots of `HANDOVER.md` go to `docs/handovers/YYYY-MM-DD_HHMM.md`
+(current UTC time), prefixed with one line
+`# Handover <timestamp> — <reason>`. Write one after every merge, whenever
+the budget rule triggers ("budget reached"), and at completion ("all issues
+done"). Snapshots are append-only — never edit or delete old ones.
+
+## Prompt templates
+
+Worker → reviewer:
+
+> Continue the autonomous relay on {{ github_owner }}/{{ project_slug }} as
+> the REVIEWER session. Fetch and check out branch `{{ integration_branch }}`,
+> read AGENTS.md, agents/RELAY.md, agents/CODING_RULES.md and HANDOVER.md.
+> Review PR #<PR> for issue #<N> following the "Reviewer session" protocol:
+> post a PR review (simplicity first, package reuse, coding-rules
+> compliance), fix only clear-cut findings yourself, merge, close issue #<N>,
+> archive the handover, then start the next worker session. Apply the budget
+> rule.
+
+Reviewer → worker:
+
+> Continue the autonomous relay on {{ github_owner }}/{{ project_slug }} as
+> the WORKER session. Fetch and check out branch `{{ integration_branch }}`,
+> read AGENTS.md, agents/RELAY.md, agents/CODING_RULES.md and HANDOVER.md.
+> Implement issue #<N> on a feature branch following the "Worker session"
+> protocol, open the PR, update HANDOVER.md, then start the reviewer session.
+> Apply the budget rule.
+
+## Activation
+
+Nothing in this file runs by itself. To start the relay:
+
+1. Create the work plan as GitHub issues, each implementable from its own
+   text alone (by hand, or with `agents/prompts/review_phase.md`).
+2. Switch the relay on: `copier update --defaults --data agent_relay=active`.
+   This marks the relay as active in `AGENTS.md` and creates `HANDOVER.md`.
+3. Fill in the work plan (issue order) in `HANDOVER.md`, commit, push.
+4. Create and push the integration branch:
+   `git checkout -b {{ integration_branch }} && git push -u origin {{ integration_branch }}`.
+5. Create the fallback task (`agents/prompts/fallback_routine.md`).
+6. Start the first worker with `agents/prompts/kickoff_worker.md`.
+
+To pause: disable the fallback task and let the current session finish. To
+retire: merge the final PR, disable the fallback task, and run
+`copier update --defaults --data agent_relay=dormant` (this removes
+`HANDOVER.md`; its final snapshot stays in `docs/handovers/`).

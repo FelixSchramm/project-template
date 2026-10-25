@@ -1,0 +1,37 @@
+# Runtime adapter: Claude Code (cloud sessions)
+
+How the relay in [`../RELAY.md`](../RELAY.md) maps onto Claude Code web
+sessions and the `claude-code-remote` MCP tools. `CLAUDE.md` at the repo root
+only imports `AGENTS.md`, because Claude Code loads `CLAUDE.md`, not
+`AGENTS.md`.
+
+## Session start
+
+If the repository is not checked out in your container (e.g. a session
+started by a scheduled task), attach it with `add_repo` (owner
+`{{ github_owner }}`, repo `{{ project_slug }}`, access `push`) and clone it
+as the tool result says.
+
+## Budget
+
+Note the `total_tokens` value at session start. The budget rule triggers when
+the remaining value falls below 10% of that starting value.
+
+## Starting the successor
+
+- **Normal case:** `create_session` in the same environment with
+  `source_url` = `https://github.com/{{ github_owner }}/{{ project_slug }}`
+  and `source_revision` = `{{ integration_branch }}`. The successor starts
+  immediately.
+- **Budget rule triggered:** `create_trigger` with `run_once_at` = now + 5
+  hours, `create_new_session_on_fire: true`, `initiation: "human_schedule"`.
+- **`create_session` refused because the session lineage limit is reached:**
+  `create_trigger` with `run_once_at` = now + 5 minutes,
+  `create_new_session_on_fire: true`, `initiation: "human_schedule"`, same
+  prompt.
+
+## Fallback task
+
+Create it with `create_trigger`: cron `0 6,18 * * *`,
+`create_new_session_on_fire: true`, prompt from
+[`../prompts/fallback_routine.md`](../prompts/fallback_routine.md).
